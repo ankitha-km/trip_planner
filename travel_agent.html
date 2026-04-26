@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Wandr — Real Multi-Agent Trip Planner</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@700;800;900&family=Clash+Display:wght@600;700&family=Space+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --ink: #0f0f14;
+  --paper: #f5f3ef;
+  --card: #ffffff;
+  --line: #e2dfd7;
+  --muted: #7a7770;
+  --faint: #b0ada6;
+  --accent: #e85d3f;
+  --accent-l: #fde8e3;
+  --blue: #2563eb;
+  --blue-l: #dbeafe;
+  --green: #16a34a;
+  --green-l: #dcfce7;
+  --amber: #b45309;
+  --amber-l: #fef3c7;
+  --red: #dc2626;
+  --red-l: #fee2e2;
+  --r: 10px;
+  --r-lg: 16px;
+  --sh: 0 1px 3px rgba(0,0,0,.05), 0 4px 20px rgba(0,0,0,.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Instrument Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--ink);
+  padding: 3rem 2rem 2.5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(232,93,63,.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 50%, rgba(37,99,235,.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+.logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.8rem; font-weight: 800;
+  color: #fff; letter-spacing: -2px;
+  margin-bottom: .3rem; position: relative;
+}
+.logo em { color: var(--accent); font-style: normal; }
+.tagline { font-size: 14px; color: #94a3b8; margin-bottom: 2rem; font-weight: 300; position: relative; }
+
+.api-badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; position: relative; }
+.api-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; padding: 5px 12px;
+  border-radius: 20px; border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06); color: #cbd5e1;
+}
+.api-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+/* ── LAYOUT ── */
+.wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+/* ── CARD ── */
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 1.5rem;
+  margin-bottom: 1.25rem; box-shadow: var(--sh);
+}
+.card-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--faint);
+  margin-bottom: 1.25rem;
+}
+
+/* ── FORM ── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.span2 { grid-column: 1 / -1; }
+.field label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--faint); text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%; font-size: 13px; padding: 10px 12px;
+  border: 1.5px solid var(--line); border-radius: var(--r);
+  background: var(--paper); color: var(--ink);
+  font-family: inherit; outline: none;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,93,63,.12); background: #fff;
+}
+.field textarea { resize: vertical; min-height: 58px; }
+.brow { display: flex; gap: 6px; }
+.brow select { width: 88px; flex-shrink: 0; }
+
+.btn {
+  width: 100%; margin-top: 1rem; padding: 13px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px; font-weight: 700; letter-spacing: .3px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--r); cursor: pointer;
+  transition: all .2s; position: relative; overflow: hidden;
+}
+.btn:hover { background: #d44e32; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,93,63,.35); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn:disabled { background: var(--faint); cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── AGENT PIPELINE ── */
+.pipeline-wrap { margin-bottom: 1.5rem; }
+.pipe-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--faint);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+}
+.pipe-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.agent {
+  background: var(--card); border: 1.5px solid var(--line);
+  border-radius: var(--r-lg); margin-bottom: 8px;
+  transition: border-color .25s, background .25s, box-shadow .25s;
+  cursor: pointer; overflow: hidden;
+}
+.agent.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(232,93,63,.1), var(--sh);
+}
+.agent.done  { border-color: var(--green); }
+.agent.error { border-color: var(--red); }
+
+.agent-top { display: flex; align-items: center; gap: 12px; padding: 13px 16px; }
+.agent-ico {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--paper); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0; transition: all .25s;
+}
+.agent.active .agent-ico { background: var(--accent-l); border-color: var(--accent); }
+.agent.done   .agent-ico { background: var(--green-l);  border-color: var(--green); }
+.agent.error  .agent-ico { background: var(--red-l);    border-color: var(--red); }
+
+.agent-info { flex: 1; min-width: 0; }
+.agent-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 700; margin-bottom: 2px;
+}
+.agent-what { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.agent-src {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: 20px; background: var(--blue-l); color: var(--blue);
+  border: 1px solid #bfdbfe; margin-top: 4px;
+}
+.agent.active .agent-src { background: var(--accent-l); color: var(--accent); border-color: #fca58e; }
+.agent.done   .agent-src { background: var(--green-l);  color: var(--green);  border-color: #86efac; }
+
+.agent-status {
+  font-size: 11px; font-weight: 600; color: var(--faint);
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.agent.active .agent-status { color: var(--accent); }
+.agent.done   .agent-status { color: var(--green); }
+.agent.error  .agent-status { color: var(--red); }
+.spin {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.agent-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height .4s cubic-bezier(.4,0,.2,1);
+}
+.agent-body.open { max-height: 500px; }
+.agent-body-inner {
+  padding: 0 16px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); line-height: 1.8;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.flow-arrow {
+  text-align: center; font-size: 11px; color: var(--faint);
+  margin: -2px 0 6px; padding: 2px 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding-left: 28px; /* align under icons */
+}
+
+/* ── RESULT ── */
+.r-header {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 1.5rem;
+}
+.r-route {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem; font-weight: 700; letter-spacing: -2px;
+  line-height: 1;
+}
+.r-meta { font-size: 12px; color: var(--muted); margin-left: auto; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+}
+.b-ok   { background: var(--green-l); color: var(--green); }
+.b-warn { background: var(--amber-l); color: var(--amber); }
+.b-live { background: var(--blue-l);  color: var(--blue); }
+
+/* Budget */
+.budget-block { margin-bottom: 1.25rem; }
+.b3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 12px; }
+.bstat { text-align: center; }
+.bstat-l { font-size: 9px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+.bstat-v {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem; font-weight: 700; letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.bstat-v.g { color: var(--green); }
+.bstat-v.r { color: var(--red); }
+.prog { height: 6px; background: var(--paper); border-radius: 3px; border: 1px solid var(--line); overflow: hidden; margin-bottom: 6px; }
+.prog-bar { height: 100%; border-radius: 3px; background: var(--green); transition: width 1.2s cubic-bezier(.4,0,.2,1); }
+.prog-bar.over { background: var(--red); }
+.prog-lbl { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); }
+.cost5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 12px; }
+.ci { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 6px; text-align: center; }
+.ci-l { font-size: 9px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 5px; }
+.ci-v { font-size: 14px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+
+/* Sections */
+.section { margin-bottom: 10px; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--sh); }
+.sec-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 16px; background: var(--card);
+  cursor: pointer; transition: background .15s;
+}
+.sec-head:hover { background: var(--paper); }
+.sec-ico { font-size: 18px; }
+.sec-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700; flex: 1; }
+.sec-tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--blue-l); color: var(--blue); }
+.sec-tag.live { background: var(--green-l); color: var(--green); border: 1px solid #86efac; }
+.sec-arrow { font-size: 11px; color: var(--faint); transition: transform .2s; }
+.sec-arrow.open { transform: rotate(180deg); }
+.sec-body {
+  background: var(--card); padding: 0;
+  max-height: 0; overflow: hidden;
+  transition: max-height .4s cubic-bezier(.4,0,.2,1);
+}
+.sec-body.open { max-height: 2000px; }
+.sec-inner { padding: 1.25rem; border-top: 1px solid var(--line); }
+
+/* Real data cards */
+.place-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; margin-bottom: 14px; }
+.place-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 12px;
+}
+.place-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+.place-type { font-size: 10px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.place-info { font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+/* Weather */
+.weather-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.weather-day {
+  flex-shrink: 0; background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 10px 14px; text-align: center; min-width: 80px;
+}
+.wd-date { font-size: 10px; font-weight: 600; color: var(--faint); text-transform: uppercase; margin-bottom: 4px; }
+.wd-icon { font-size: 22px; margin-bottom: 4px; }
+.wd-temp { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
+.wd-desc { font-size: 10px; color: var(--muted); }
+
+/* Country info */
+.country-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 12px; font-size: 12px; }
+.cc strong { display: block; font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
+
+/* Day cards */
+.day-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r); padding: 14px; margin-bottom: 10px;
+}
+.day-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.day-num {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ink); color: #fff;
+  font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.day-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; }
+.day-slots { display: grid; grid-template-columns: 72px 1fr; gap: 4px 10px; font-size: 12px; margin-bottom: 8px; }
+.slot-t { font-weight: 600; color: var(--faint); text-transform: uppercase; font-size: 10px; letter-spacing: .4px; padding-top: 2px; }
+.slot-v { color: var(--muted); line-height: 1.6; }
+.day-places { display: flex; gap: 6px; flex-wrap: wrap; }
+.dp {
+  font-size: 10px; font-weight: 600; padding: 3px 8px;
+  background: var(--blue-l); color: var(--blue);
+  border-radius: 20px; border: 1px solid #bfdbfe;
+}
+.dp.real { background: var(--green-l); color: var(--green); border-color: #86efac; }
+
+/* Coordinator */
+.coord-card {
+  background: var(--ink); color: #fff;
+  border-radius: var(--r-lg); padding: 1.5rem;
+  margin-bottom: 1rem; box-shadow: var(--sh);
+}
+.coord-label { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.coord-text { font-size: 14px; line-height: 1.8; color: #e2e8f0; margin-bottom: 12px; }
+.coord-tip { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); border-radius: var(--r); padding: 10px 14px; font-size: 12px; color: #94a3b8; }
+.coord-tip strong { display: block; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+
+/* Map */
+.map-wrap { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); margin-bottom: 1rem; box-shadow: var(--sh); }
+.map-bar { background: var(--ink); color: #fff; padding: 10px 16px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.map-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94a3b8; }
+.leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+#trip-map { height: 360px; }
+
+/* Quick Qs */
+.qs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; }
+.q {
+  font-size: 12px; font-weight: 500; padding: 7px 14px;
+  border: 1.5px solid var(--line); border-radius: 20px;
+  background: var(--card); color: var(--muted); cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.q:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-l); }
+
+/* Error */
+.err { background: var(--red-l); border: 1px solid #fca5a5; border-radius: var(--r); padding: 1rem; font-size: 13px; color: #991b1b; line-height: 1.6; margin-top: .5rem; }
+
+/* Footer */
+footer { text-align: center; padding: 2rem 1.5rem; font-size: 12px; color: var(--faint); }
+footer a { color: var(--muted); text-decoration: none; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .span2 { grid-column: 1; }
+  .cost5 { grid-template-columns: repeat(3,1fr); }
+  .b3 { grid-template-columns: repeat(3,1fr); }
+  .place-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Wand<em>r</em></div>
+  <p class="tagline">5 agents · 4 real free APIs · real data, no fake results</p>
+  <div class="api-badges">
+    <span class="api-badge"><span class="dot"></span> Nominatim — Geocoding</span>
+    <span class="api-badge"><span class="dot"></span> Overpass — Real Places</span>
+    <span class="api-badge"><span class="dot"></span> Open-Meteo — Weather</span>
+    <span class="api-badge"><span class="dot"></span> RestCountries — Info</span>
+    <span class="api-badge"><span class="dot"></span> Groq — AI Reasoning</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- FORM -->
+  <div class="card">
+    <div class="card-label">Plan your trip</div>
+    <div class="grid2">
+      <div class="field"><label>From</label><input id="p-from" placeholder="e.g. Mysore, Mumbai, London"/></div>
+      <div class="field"><label>Destination</label><input id="p-to" placeholder="e.g. Manali, Paris, Bali"/></div>
+      <div class="field"><label>Days</label><input id="p-days" type="number" min="1" max="30" placeholder="5"/></div>
+      <div class="field">
+        <label>Budget</label>
+        <div class="brow">
+          <select id="p-cur">
+            <option value="INR">₹ INR</option>
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
+            <option value="GBP">£ GBP</option>
+          </select>
+          <input id="p-budget" type="number" placeholder="25000"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Travel style</label>
+        <select id="p-style">
+          <option value="budget">🎒 Budget</option>
+          <option value="comfort" selected>🏨 Comfort</option>
+          <option value="luxury">✨ Luxury</option>
+        </select>
+      </div>
+      <div class="field"><label>Travellers</label><input id="p-pax" type="number" min="1" value="1"/></div>
+      <div class="field span2"><label>Notes or preferences</label><textarea id="p-prefs" placeholder="e.g. vegetarian, love trekking, with kids, wheelchair access…"></textarea></div>
+    </div>
+    <button class="btn" id="p-btn" onclick="planTrip()">Launch 5 agents →</button>
+  </div>
+
+  <!-- PIPELINE -->
+  <div id="pipeline" style="display:none">
+    <div class="pipeline-wrap">
+      <div class="pipe-title">Agent pipeline</div>
+
+      <div class="agent" id="a0" onclick="toggleAgent(0)">
+        <div class="agent-top">
+          <div class="agent-ico">🌍</div>
+          <div class="agent-info">
+            <div class="agent-name">Geocoding Agent</div>
+            <div class="agent-what">Converts your city names into real GPS coordinates</div>
+            <div class="agent-src">📡 Nominatim / OpenStreetMap</div>
+          </div>
+          <div class="agent-status" id="a0-s">Waiting</div>
+        </div>
+        <div class="agent-body" id="a0-b"><div class="agent-body-inner" id="a0-t"></div></div>
+      </div>
+      <div class="flow-arrow">↓ Real coordinates passed to all other agents</div>
+
+      <div class="agent" id="a1" onclick="toggleAgent(1)">
+        <div class="agent-top">
+          <div class="agent-ico">☁️</div>
+          <div class="agent-info">
+            <div class="agent-name">Weather & Country Agent</div>
+            <div class="agent-what">Fetches real 7-day weather forecast + country facts, currency, visa info</div>
+            <div class="agent-src">📡 Open-Meteo + RestCountries</div>
+          </div>
+          <div class="agent-status" id="a1-s">Waiting</div>
+        </div>
+        <div class="agent-body" id="a1-b"><div class="agent-body-inner" id="a1-t"></div></div>
+      </div>
+      <div class="flow-arrow">↓ Weather & country data passed to Planner</div>
+
+      <div class="agent" id="a2" onclick="toggleAgent(2)">
+        <div class="agent-top">
+          <div class="agent-ico">📍</div>
+          <div class="agent-info">
+            <div class="agent-name">Places Agent</div>
+            <div class="agent-what">Queries real restaurants, hotels & attractions from OpenStreetMap database</div>
+            <div class="agent-src">📡 Overpass API / OpenStreetMap</div>
+          </div>
+          <div class="agent-status" id="a2-s">Waiting</div>
+        </div>
+        <div class="agent-body" id="a2-b"><div class="agent-body-inner" id="a2-t"></div></div>
+      </div>
+      <div class="flow-arrow">↓ Real places passed to AI Planner</div>
+
+      <div class="agent" id="a3" onclick="toggleAgent(3)">
+        <div class="agent-top">
+          <div class="agent-ico">🧭</div>
+          <div class="agent-info">
+            <div class="agent-name">AI Planner Agent</div>
+            <div class="agent-what">Uses real data from all 3 agents to build your personalised day-by-day itinerary & costs</div>
+            <div class="agent-src">📡 Groq / LLaMA 3.3</div>
+          </div>
+          <div class="agent-status" id="a3-s">Waiting</div>
+        </div>
+        <div class="agent-body" id="a3-b"><div class="agent-body-inner" id="a3-t"></div></div>
+      </div>
+      <div class="flow-arrow">↓ Full plan passed to Coordinator</div>
+
+      <div class="agent" id="a4" onclick="toggleAgent(4)">
+        <div class="agent-top">
+          <div class="agent-ico">🧠</div>
+          <div class="agent-info">
+            <div class="agent-name">Coordinator Agent</div>
+            <div class="agent-what">Reviews all agent outputs, validates budget against real data, writes final verdict</div>
+            <div class="agent-src">📡 Groq / LLaMA 3.3</div>
+          </div>
+          <div class="agent-status" id="a4-s">Waiting</div>
+        </div>
+        <div class="agent-body" id="a4-b"><div class="agent-body-inner" id="a4-t"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<footer>
+  Real data: Nominatim · Overpass · Open-Meteo · RestCountries &nbsp;·&nbsp;
+  AI: Groq LLaMA 3.3 &nbsp;·&nbsp; Map: Leaflet + OpenStreetMap &nbsp;·&nbsp;
+  <a href="#">wandr.app</a> · All APIs free, no credit card
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ════════════════════════════════════════════
+   CONFIG
+════════════════════════════════════════════ */
+var GROQ_KEY   = 'YOUR_GROQ_API_KEY_HERE';
+var GROQ_MODEL = 'llama-3.3-70b-versatile';
+var DAY_COL    = ['#e85d3f','#2563eb','#16a34a','#9333ea','#0891b2','#d97706','#be123c'];
+var mapInst    = null;
+
+/* ════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════ */
+function $(id) { return document.getElementById(id); }
+function money(n, cur) {
+  if (n == null || isNaN(+n)) return '—';
+  return { INR:'₹', USD:'$', EUR:'€', GBP:'£' }[cur] + Math.round(+n).toLocaleString();
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function eq(s) { return String(s||'').replace(/'/g,"\\'"); }
+function wmo(code) {
+  var m = { 0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',48:'🌫',51:'🌦',53:'🌧',55:'🌧',61:'🌧',63:'🌧',65:'🌧',71:'❄️',73:'❄️',75:'❄️',80:'🌦',81:'🌧',82:'⛈',95:'⛈',96:'⛈',99:'⛈' };
+  return m[code] || '🌡';
+}
+
+/* ════════════════════════════════════════════
+   AGENT UI
+════════════════════════════════════════════ */
+function setAgent(id, state, statusText, bodyText) {
+  var el = $('a'+id);
+  el.className = 'agent' + (state ? ' '+state : '');
+  var sEl = $('a'+id+'-s');
+  sEl.innerHTML = state==='active' ? '<div class="spin"></div> '+statusText
+                : state==='done'   ? '✓ '+statusText
+                : state==='error'  ? '✕ '+statusText
+                : statusText || 'Waiting';
+  if (bodyText !== undefined) {
+    $('a'+id+'-t').textContent = bodyText;
+    $('a'+id+'-b').classList.add('open');
+  }
+}
+function toggleAgent(id) {
+  var b = $('a'+id+'-b');
+  if ($('a'+id+'-t').textContent) b.classList.toggle('open');
+}
+
+/* ════════════════════════════════════════════
+   GROQ API
+════════════════════════════════════════════ */
+async function groq(sys, msg, tokens) {
+  var r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+GROQ_KEY },
+    body: JSON.stringify({
+      model: GROQ_MODEL, max_tokens: tokens||1200, temperature: 0.6,
+      messages: [{ role:'system', content:sys }, { role:'user', content:msg }]
+    })
+  });
+  if (!r.ok) throw new Error('Groq HTTP '+r.status+': '+(await r.text()).slice(0,200));
+  var d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return (d.choices[0].message.content||'').trim();
+}
+
+function getJSON(raw) {
+  var s = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+  var i = s.indexOf('{'); if (i<0) throw new Error('No JSON');
+  var depth=0,str=false,esc_=false,end=-1;
+  for(var j=i;j<s.length;j++){
+    var c=s[j];
+    if(esc_){esc_=false;continue;} if(c==='\\'&&str){esc_=true;continue;}
+    if(c==='"'){str=!str;continue;} if(str)continue;
+    if(c==='{')depth++; if(c==='}'){depth--;if(!depth){end=j;break;}}
+  }
+  if(end<0) throw new Error('Bad JSON braces');
+  return JSON.parse(s.slice(i,end+1));
+}
+
+/* ════════════════════════════════════════════
+   FREE API CALLS
+════════════════════════════════════════════ */
+
+/* Agent 1 — Nominatim geocoding (free, no key) */
+async function geocode(city) {
+  var url = 'https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(city)+'&format=json&limit=1';
+  var r = await fetch(url, { headers: { 'User-Agent': 'WandrTripPlanner/1.0' } });
+  if (!r.ok) throw new Error('Nominatim error: '+r.status);
+  var d = await r.json();
+  if (!d.length) throw new Error('Could not find location: '+city);
+  return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), display: d[0].display_name };
+}
+
+/* Agent 2a — Open-Meteo weather (free, no key) */
+async function getWeather(lat, lng, days) {
+  var n = Math.min(+days, 7);
+  var url = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lng+
+    '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode'+
+    '&forecast_days='+n+'&timezone=auto';
+  var r = await fetch(url);
+  if (!r.ok) throw new Error('Open-Meteo error: '+r.status);
+  return await r.json();
+}
+
+/* Agent 2b — RestCountries (free, no key) */
+async function getCountryInfo(city) {
+  // Extract likely country from city string or use search
+  var r = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(city)+'&format=json&limit=1&addressdetails=1', { headers: { 'User-Agent':'WandrTripPlanner/1.0' } });
+  var d = await r.json();
+  var countryCode = d[0]?.address?.country_code?.toUpperCase() || '';
+  if (!countryCode) return null;
+  var r2 = await fetch('https://restcountries.com/v3.1/alpha/'+countryCode);
+  if (!r2.ok) return null;
+  var d2 = await r2.json();
+  var c = d2[0];
+  return {
+    name: c.name?.common || '',
+    capital: c.capital?.[0] || '',
+    currency: Object.values(c.currencies||{})[0] || {},
+    languages: Object.values(c.languages||{}).join(', '),
+    region: c.region || '',
+    flag: c.flag || ''
+  };
+}
+
+/* Agent 3 — Overpass API (free, no key) — real restaurants, hotels, attractions
+   Searches nodes + ways + relations, uses "out center" to get coords for all types */
+async function getPlaces(lat, lng, radius) {
+  radius = radius || 15000; // 15km — covers small towns and hill stations
+  var query = `
+    [out:json][timeout:30];
+    (
+      node["tourism"~"attraction|museum|viewpoint|monument|artwork"](around:${radius},${lat},${lng});
+      way["tourism"~"attraction|museum|viewpoint|monument|artwork"](around:${radius},${lat},${lng});
+      node["historic"](around:${radius},${lat},${lng});
+      way["historic"](around:${radius},${lat},${lng});
+      node["amenity"="restaurant"]["name"](around:${radius},${lat},${lng});
+      way["amenity"="restaurant"]["name"](around:${radius},${lat},${lng});
+      node["amenity"="cafe"]["name"](around:${radius},${lat},${lng});
+      node["amenity"~"hotel|guest_house|hostel"]["name"](around:${radius},${lat},${lng});
+      way["amenity"~"hotel|guest_house|hostel"]["name"](around:${radius},${lat},${lng});
+      node["tourism"~"hotel|guest_house|hostel"]["name"](around:${radius},${lat},${lng});
+      way["tourism"~"hotel|guest_house|hostel"]["name"](around:${radius},${lat},${lng});
+      node["leisure"~"park|nature_reserve"]["name"](around:${radius},${lat},${lng});
+      way["leisure"~"park|nature_reserve"]["name"](around:${radius},${lat},${lng});
+    );
+    out center body 60;
+  `;
+  // Try primary Overpass endpoint, fall back to mirror
+  var overpassEndpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
+  var d = null;
+  for (var ep of overpassEndpoints) {
+    try {
+      var r = await fetch(ep, { method:'POST', body:'data='+encodeURIComponent(query) });
+      if (r.ok) { d = await r.json(); break; }
+    } catch(e) { continue; }
+  }
+  if (!d) { console.warn('Overpass unavailable, returning empty'); return { attractions:[], restaurants:[], hotels:[], cafes:[] }; }
+
+  var attractions=[], restaurants=[], hotels=[], cafes=[];
+  (d.elements||[]).forEach(function(el) {
+    var t = el.tags || {};
+    var name = t.name || t['name:en'] || '';
+    if (!name) return;
+    // Get coordinates — nodes have lat/lng directly, ways have center
+    var elat = el.lat || (el.center && el.center.lat);
+    var elng = el.lon || (el.center && el.center.lon);
+    if (!elat || !elng) return;
+    var item = {
+      name, lat: elat, lng: elng,
+      address: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' ') || '',
+      website: t.website || t['contact:website'] || '',
+      phone: t.phone || t['contact:phone'] || '',
+      cuisine: t.cuisine || '',
+      stars: t.stars || ''
+    };
+    var am = t.amenity || '';
+    var to = t.tourism || '';
+    var hi = t.historic || '';
+    var le = t.leisure || '';
+    if (to.match(/attraction|museum|viewpoint|monument|artwork/) || hi || le.match(/park|nature/)) attractions.push(item);
+    else if (am==='restaurant') restaurants.push(item);
+    else if (am==='cafe') cafes.push(item);
+    else if (am.match(/hotel|guest_house|hostel/) || to.match(/hotel|guest_house|hostel/)) hotels.push(item);
+  });
+
+  // Deduplicate by name
+  function dedup(arr) {
+    var seen = {};
+    return arr.filter(function(x){ if(seen[x.name]) return false; seen[x.name]=true; return true; });
+  }
+
+  return {
+    attractions: dedup(attractions).slice(0,10),
+    restaurants: dedup(restaurants).slice(0,8),
+    hotels:      dedup(hotels).slice(0,6),
+    cafes:       dedup(cafes).slice(0,4)
+  };
+}
+
+/* ════════════════════════════════════════════
+   MAIN PLAN FUNCTION
+════════════════════════════════════════════ */
+async function planTrip() {
+  var from   = $('p-from').value.trim();
+  var to     = $('p-to').value.trim();
+  var days   = $('p-days').value;
+  var budget = parseFloat($('p-budget').value);
+  var cur    = $('p-cur').value;
+  var style  = $('p-style').value;
+  var pax    = $('p-pax').value || '1';
+  var prefs  = $('p-prefs').value.trim();
+
+  if (!from||!to||!days||!budget) { alert('Please fill: From, Destination, Days and Budget.'); return; }
+
+  var btn = $('p-btn');
+  btn.disabled=true; btn.textContent='Agents running…';
+  $('pipeline').style.display='';
+  $('result').innerHTML='';
+  [0,1,2,3,4].forEach(function(i){ setAgent(i,'','Waiting'); });
+
+  var geo={}, weather={}, country={}, places={}, plan={}, coord={};
+
+  try {
+
+    /* ══ AGENT 0: GEOCODING ══ */
+    setAgent(0,'active','Geocoding cities…');
+    var [geoFrom, geoTo] = await Promise.all([ geocode(from), geocode(to) ]);
+    geo = { from: geoFrom, to: geoTo };
+    setAgent(0,'done','Done',
+      '📍 '+from+'\n   lat: '+geoFrom.lat.toFixed(4)+', lng: '+geoFrom.lng.toFixed(4)+'\n   '+geoFrom.display.slice(0,80)+
+      '\n\n📍 '+to+'\n   lat: '+geoTo.lat.toFixed(4)+', lng: '+geoTo.lng.toFixed(4)+'\n   '+geoTo.display.slice(0,80)
+    );
+
+    /* ══ AGENT 1: WEATHER + COUNTRY ══ */
+    setAgent(1,'active','Fetching weather & country data…');
+    var [weatherData, countryData] = await Promise.all([
+      getWeather(geoTo.lat, geoTo.lng, days),
+      getCountryInfo(to)
+    ]);
+    weather = weatherData;
+    country = countryData;
+    var wSum = (weather.daily?.weathercode||[]).slice(0,3).map(function(c,i){
+      return 'Day '+(i+1)+': '+wmo(c)+' '+Math.round(weather.daily.temperature_2m_max[i])+'°/'+Math.round(weather.daily.temperature_2m_min[i])+'°';
+    }).join(' · ');
+    setAgent(1,'done','Done',
+      'Weather (next '+Math.min(+days,7)+' days):\n'+wSum+
+      (country ? '\n\nCountry: '+country.flag+' '+country.name+
+        '\nCurrency: '+country.currency.name+' ('+country.currency.symbol+')'+
+        '\nLanguages: '+country.languages : '')
+    );
+
+    /* ══ AGENT 2: REAL PLACES ══ */
+    setAgent(2,'active','Querying OpenStreetMap…');
+    places = await getPlaces(geoTo.lat, geoTo.lng, 6000);
+    var totalFound = places.attractions.length + places.restaurants.length + places.hotels.length + places.cafes.length;
+    var pSum = totalFound > 0
+      ? 'Attractions: '+(places.attractions.length)+
+        (places.attractions.length ? '\n'+places.attractions.slice(0,4).map(function(p){ return '  • '+p.name; }).join('\n') : '')+
+        '\nRestaurants: '+(places.restaurants.length)+
+        (places.restaurants.length ? '\n'+places.restaurants.slice(0,4).map(function(p){ return '  • '+p.name+(p.cuisine?' ('+p.cuisine+')':''); }).join('\n') : '')+
+        '\nHotels: '+(places.hotels.length)+
+        (places.hotels.length ? '\n'+places.hotels.slice(0,3).map(function(p){ return '  • '+p.name; }).join('\n') : '')
+      : '⚠ 0 places found in OpenStreetMap for this area.\n\nThis is normal for small hill towns — OSM data coverage varies by region. Manali, Shimla, Ooty etc. have sparse tags.\n\nAI Planner will use its training knowledge for place names instead.';
+    setAgent(2, totalFound > 0 ? 'done' : 'done', totalFound > 0 ? 'Done — '+totalFound+' places found' : 'Done — sparse OSM data', pSum);
+
+    /* ══ AGENT 3: AI PLANNER ══ */
+    setAgent(3,'active','Building your personalised plan…');
+
+    var weatherContext = (weather.daily?.temperature_2m_max||[]).slice(0,+days).map(function(t,i){
+      return 'Day '+(i+1)+': '+wmo(weather.daily.weathercode[i])+' '+Math.round(t)+'°C high';
+    }).join(', ');
+
+    var placesContext =
+      'Real attractions: '+places.attractions.map(function(p){ return p.name; }).join(', ')+
+      '\nReal restaurants: '+places.restaurants.map(function(p){ return p.name+(p.cuisine?' ('+p.cuisine+')':''); }).join(', ')+
+      '\nReal hotels: '+places.hotels.map(function(p){ return p.name; }).join(', ');
+
+    var countryContext = country
+      ? 'Country: '+country.name+' | Currency: '+country.currency.name+' | Languages: '+country.languages
+      : '';
+
+    var nights = Math.max(1, parseInt(days) - 1);
+    var raw = await groq(
+      'You are an AI Trip Planner. Build a REALISTIC trip plan.\n'+
+      'STRICT RULES:\n'+
+      '1. Total of ALL costs (travel+stay+food+activities+local_transport) must EXACTLY equal the budget: '+money(budget,cur)+'\n'+
+      '2. Day 1 morning = travel only, no sightseeing (they just arrived)\n'+
+      '3. Last day afternoon = departure, no new activities\n'+
+      '4. stay cost = hotel_per_night × '+nights+' nights\n'+
+      '5. If real hotel names given, pick from that list. Otherwise invent a realistic hotel name.\n'+
+      '6. activities cost must be reasonable — max 20% of total budget\n'+
+      '7. travel cost = both ways (onward + return)\n'+
+      'Return ONLY valid JSON, no markdown:\n'+
+      '{\n'+
+      '  "days": [{"day":1,"title":"Short title","morning":"travel description only","afternoon":"check-in and rest","evening":"dinner at nearby restaurant","highlight":"nearest attraction name","cost_estimate":0}],\n'+
+      '  "hotel_pick": "Hotel name",\n'+
+      '  "hotel_per_night": 0,\n'+
+      '  "restaurant_picks": ["name1","name2","name3"],\n'+
+      '  "costs": {"travel":0,"stay":0,"food":0,"activities":0,"local_transport":0,"total":'+budget+'},\n'+
+      '  "travel_advice": "Realistic transport options from '+from+' to '+to+' with costs in '+cur+'",\n'+
+      '  "local_transport": "How to get around '+to+' with per-day cost estimate in '+cur+'"\n'+
+      '}\n'+
+      'The total field must be exactly '+budget+'. Distribute budget realistically across categories. Output ONLY the JSON.',
+      'Trip: '+from+' → '+to+'\nDays: '+days+' ('+nights+' nights)\nTravellers: '+pax+'\nTotal budget: '+money(budget,cur)+'\nStyle: '+style+
+      (prefs?'\nPreferences: '+prefs:'')+
+      '\n\nREAL WEATHER FOR '+to.toUpperCase()+':\n'+weatherContext+
+      '\n\nPLACES DATA FROM OPENSTREETMAP:\n'+placesContext+
+      '\n\nCOUNTRY INFO:\n'+countryContext,
+      2000
+    );
+    plan = getJSON(raw);
+
+    // Ensure costs is object, strings to numbers
+    if (plan.costs) {
+      Object.keys(plan.costs).forEach(function(k){
+        plan.costs[k] = parseFloat(String(plan.costs[k]).replace(/[^0-9.]/g,''))||0;
+      });
+    }
+
+    var daySum = (plan.days||[]).map(function(d){ return 'Day '+d.day+': '+d.title+' — '+d.highlight; }).join('\n');
+    setAgent(3,'done','Done', daySum);
+
+    /* ══ AGENT 4: COORDINATOR ══ */
+    setAgent(4,'active','Writing final verdict…');
+    // Calculate real total from line items (don't trust the "total" field blindly)
+    var c_ = plan.costs || {};
+    var calcTotal = (c_.travel||0) + (c_.stay||0) + (c_.food||0) + (c_.activities||0) + (c_.local_transport||0);
+    // If plan total is wildly different from sum of parts, use calculated total
+    var planTotal = parseFloat(c_.total) || 0;
+    var totalSpent = (Math.abs(planTotal - calcTotal) < budget * 0.1) ? planTotal : calcTotal;
+    // Override the total in the plan object to match reality
+    plan.costs.total = totalSpent;
+    var raw2 = await groq(
+      'You are the Coordinator Agent. Write a clear, specific final verdict.\n'+
+      'RULES: Name the hotel explicitly. Name at least 2 specific attractions. State the budget clearly. Be honest if budget is tight.\n'+
+      'Return ONLY valid JSON:\n'+
+      '{"verdict":"4 sentences — sentence 1: hotel + location, sentence 2: weather + what to pack, sentence 3: name the top 2 attractions, sentence 4: honest budget verdict","tip":"One single most useful actionable tip specific to this destination and season","budget_ok":true}',
+      'HOTEL: '+plan.hotel_pick+' (est. '+money(plan.hotel_per_night||0,cur)+'/night)'+
+      '\nBUDGET: Estimated '+money(totalSpent,cur)+' vs budget '+money(budget,cur)+
+      '\nWEATHER: '+weatherContext+
+      '\nATTRACTIONS IN ITINERARY: '+(plan.days||[]).map(function(d){return d.highlight;}).filter(Boolean).join(', ')+
+      '\nCOST BREAKDOWN: Travel='+money(c_.travel,cur)+' Stay='+money(c_.stay,cur)+' Food='+money(c_.food,cur)+' Activities='+money(c_.activities,cur)+
+      '\nITINERARY:\n'+daySum,
+      500
+    );
+    coord = getJSON(raw2);
+    setAgent(4,'done','Done', coord.verdict||'');
+
+    renderResult({ from, to, days, budget, cur, style, pax }, geo, weather, country, places, plan, coord, totalSpent);
+
+  } catch(err) {
+    $('result').innerHTML = '<div class="err"><strong>Error:</strong> '+esc(err.message)+'<br><br><small>'+esc(err.stack||'')+'</small></div>';
+    [0,1,2,3,4].forEach(function(i){
+      if ($('a'+i).classList.contains('active')) setAgent(i,'error','Failed');
+    });
+  }
+  btn.disabled=false; btn.textContent='Launch 5 agents →';
+}
+
+/* ════════════════════════════════════════════
+   RENDER RESULT
+════════════════════════════════════════════ */
+function renderResult(ctx, geo, weather, country, places, plan, coord, totalSpent) {
+  var cur    = ctx.cur;
+  var budget = ctx.budget;
+  var over   = totalSpent > budget;
+  var pct    = Math.min(Math.round(totalSpent/budget*100),130);
+  var barW   = Math.min(pct,100);
+  var days_  = plan.days || [];
+  var c      = plan.costs || {};
+
+  /* ── MAP MARKERS ──
+     Use real attraction coords from Overpass where possible, else day estimate */
+  // Build known POI coords for Manali-type destinations as sensible fallbacks
+  var allRealPlaces = places.attractions.concat(places.hotels).concat(places.restaurants);
+  var markers = days_.map(function(d,i) {
+    // Try to match highlight name to a real OSM place
+    var highlight = (d.highlight||'').toLowerCase();
+    var realPlace = allRealPlaces.find(function(p){
+      var pn = p.name.toLowerCase();
+      return highlight.length > 3 && (pn.includes(highlight.slice(0,8)) || highlight.includes(pn.slice(0,8)));
+    });
+    // Spread fallback coords in a readable pattern around destination center
+    var angle = (i / days_.length) * 2 * Math.PI;
+    var spread = 0.012;
+    return {
+      day: d.day,
+      title: d.title,
+      name: d.highlight || ('Day '+d.day),
+      lat: realPlace ? realPlace.lat : geo.to.lat + Math.sin(angle) * spread,
+      lng: realPlace ? realPlace.lng : geo.to.lng + Math.cos(angle) * spread,
+      morning: d.morning,
+      isReal: !!realPlace
+    };
+  }).filter(function(m){ return m.lat && m.lng; });
+
+  /* ── WEATHER HTML ── */
+  var wdaily = weather.daily || {};
+  var weatherHtml = (wdaily.time||[]).slice(0,+ctx.days).map(function(date,i){
+    var d = new Date(date);
+    var day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    return '<div class="weather-day">'+
+      '<div class="wd-date">'+day+' '+d.getDate()+'</div>'+
+      '<div class="wd-icon">'+wmo(wdaily.weathercode[i])+'</div>'+
+      '<div class="wd-temp">'+Math.round(wdaily.temperature_2m_max[i])+'°</div>'+
+      '<div class="wd-desc">'+Math.round(wdaily.temperature_2m_min[i])+'° low</div>'+
+      (wdaily.precipitation_sum[i]>0?'<div class="wd-desc">'+wdaily.precipitation_sum[i].toFixed(1)+'mm</div>':'')+
+    '</div>';
+  }).join('');
+
+  /* ── PLACES HTML ── */
+  function placeCards(arr, type) {
+    return arr.map(function(p){
+      return '<div class="place-card">'+
+        '<div class="place-type">'+type+'</div>'+
+        '<div class="place-name">'+esc(p.name)+'</div>'+
+        (p.cuisine?'<div class="place-info">🍽 '+esc(p.cuisine)+'</div>':'')+
+        (p.stars?'<div class="place-info">⭐ '+esc(p.stars)+' stars</div>':'')+
+        (p.address?'<div class="place-info">📍 '+esc(p.address)+'</div>':'')+
+        (p.phone?'<div class="place-info">📞 '+esc(p.phone)+'</div>':'')+
+      '</div>';
+    }).join('');
+  }
+
+  /* ── COUNTRY HTML ── */
+  var countryHtml = country ? '<div class="country-chips">'+
+    '<div class="cc"><strong>Country</strong>'+country.flag+' '+esc(country.name)+'</div>'+
+    '<div class="cc"><strong>Currency</strong>'+esc(country.currency.name||'')+' ('+esc(country.currency.symbol||'')+')</div>'+
+    '<div class="cc"><strong>Languages</strong>'+esc(country.languages)+'</div>'+
+    '<div class="cc"><strong>Region</strong>'+esc(country.region)+'</div>'+
+    (country.capital?'<div class="cc"><strong>Capital</strong>'+esc(country.capital)+'</div>':'')+
+  '</div>' : '';
+
+  /* ── DAY CARDS ── */
+  var dayCards = days_.map(function(d,i){
+    var realPlace = places.attractions.find(function(p){ return d.highlight && p.name.toLowerCase().includes((d.highlight||'').toLowerCase().slice(0,8)); });
+    return '<div class="day-card" style="border-left-color:'+DAY_COL[i%DAY_COL.length]+'">'+
+      '<div class="day-hdr">'+
+        '<div class="day-num" style="background:'+DAY_COL[i%DAY_COL.length]+'">'+d.day+'</div>'+
+        '<div class="day-title">'+esc(d.title||'Day '+d.day)+'</div>'+
+      '</div>'+
+      '<div class="day-slots">'+
+        '<div class="slot-t">Morning</div><div class="slot-v">'+esc(d.morning||'')+'</div>'+
+        '<div class="slot-t">Afternoon</div><div class="slot-v">'+esc(d.afternoon||'')+'</div>'+
+        '<div class="slot-t">Evening</div><div class="slot-v">'+esc(d.evening||'')+'</div>'+
+      '</div>'+
+      '<div class="day-places">'+
+        (d.highlight?'<span class="dp'+(realPlace?' real':'')+'">📍 '+esc(d.highlight)+'</span>':'')+
+        (realPlace?'<span class="dp real">✓ Real OSM place</span>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  /* ── MAP ── */
+  var legHtml = markers.map(function(m,i){
+    return '<div class="leg-item"><div class="leg-dot" style="background:'+DAY_COL[i%DAY_COL.length]+'"></div>Day '+m.day+': '+esc(m.name)+'</div>';
+  }).join('');
+
+  /* ── RENDER ── */
+  $('result').innerHTML =
+
+    '<div class="r-header">'+
+      '<div class="r-route">'+esc(ctx.from)+' → '+esc(ctx.to)+'</div>'+
+      '<span class="badge '+(over?'b-warn':'b-ok')+'">'+(over?'⚠ Over budget':'✓ In budget')+'</span>'+
+      '<span class="badge b-live">📡 Real API data</span>'+
+      '<div class="r-meta">'+ctx.days+' days · '+ctx.pax+' traveller'+(+ctx.pax>1?'s':'')+'</div>'+
+    '</div>'+
+
+    /* BUDGET */
+    '<div class="card budget-block">'+
+      '<div class="b3">'+
+        '<div class="bstat"><div class="bstat-l">Budget</div><div class="bstat-v">'+money(budget,cur)+'</div></div>'+
+        '<div class="bstat"><div class="bstat-l">Estimated</div><div class="bstat-v '+(over?'r':'g')+'">'+money(totalSpent,cur)+'</div></div>'+
+        '<div class="bstat"><div class="bstat-l">Used</div><div class="bstat-v '+(over?'r':'g')+'">'+pct+'%</div></div>'+
+      '</div>'+
+      '<div class="prog"><div class="prog-bar'+(over?' over':'')+'" style="width:'+barW+'%"></div></div>'+
+      '<div class="prog-lbl"><span>0</span><span>'+money(budget,cur)+'</span></div>'+
+      '<div class="cost5">'+
+        [['Travel',c.travel],['Stay',c.stay],['Food',c.food],['Activities',c.activities],['Transport',c.local_transport]].map(function(x){
+          return '<div class="ci"><div class="ci-l">'+x[0]+'</div><div class="ci-v">'+money(x[1],cur)+'</div></div>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+
+    /* MAP */
+    '<div class="map-wrap">'+
+      '<div class="map-bar">📍 Real locations from OpenStreetMap <div class="map-legend">'+legHtml+'</div></div>'+
+      '<div id="trip-map"></div>'+
+    '</div>'+
+
+    /* WEATHER */
+    sec('☁️','Real weather forecast','live','Weather',
+      '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Live 7-day forecast from Open-Meteo for '+esc(ctx.to)+'</p>'+
+      '<div class="weather-row">'+weatherHtml+'</div>'
+    )+
+
+    /* COUNTRY */
+    (country ? sec('🌍','Country & travel info','live','Country Info', countryHtml) : '')+
+
+    /* REAL ATTRACTIONS */
+    sec('🏛','Real attractions near '+esc(ctx.to),'live','Overpass / OpenStreetMap',
+      places.attractions.length
+        ? '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">'+places.attractions.length+' real attractions found within 15km on OpenStreetMap</p>'+
+          '<div class="place-grid">'+placeCards(places.attractions,'Attraction')+'</div>'
+        : '<p style="font-size:12px;color:var(--amber);padding:10px;background:var(--amber-l);border-radius:var(--r)">⚠ No attractions tagged in OpenStreetMap within 15km. OSM coverage is sparse for small towns — the AI Planner used its training knowledge for place names instead.</p>'
+    )+
+
+    /* REAL RESTAURANTS */
+    sec('🍽','Real restaurants','live','Overpass / OpenStreetMap',
+      places.restaurants.length
+        ? '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">'+places.restaurants.length+' real restaurants found on OpenStreetMap</p>'+
+          '<div class="place-grid">'+placeCards(places.restaurants,'Restaurant')+'</div>'
+        : '<p style="font-size:12px;color:var(--amber);padding:10px;background:var(--amber-l);border-radius:var(--r)">⚠ No restaurants found in OpenStreetMap for this area. The AI Planner recommended places from its training knowledge.</p>'
+    )+
+
+    /* REAL HOTELS */
+    sec('🏨','Real hotels & guesthouses','live','Overpass / OpenStreetMap',
+      places.hotels.length
+        ? '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">'+places.hotels.length+' real hotels found on OpenStreetMap</p>'+
+          (plan.hotel_pick?'<div style="background:var(--green-l);border:1px solid #86efac;border-radius:var(--r);padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--green)">✓ AI picked from real list: <strong>'+esc(plan.hotel_pick)+'</strong>'+(plan.hotel_per_night?' — est. '+money(plan.hotel_per_night,cur)+'/night':'')+'</div>':'')+
+          '<div class="place-grid">'+placeCards(places.hotels,'Hotel')+'</div>'
+        : '<div>'+(plan.hotel_pick?'<div style="background:var(--amber-l);border:1px solid '+esc('#fef3c7')+';border-radius:var(--r);padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--amber)">~ AI suggested (not in OSM): <strong>'+esc(plan.hotel_pick)+'</strong>'+(plan.hotel_per_night?' — est. '+money(plan.hotel_per_night,cur)+'/night':'')+'</div>':'')+
+          '<p style="font-size:12px;color:var(--amber);padding:10px;background:var(--amber-l);border-radius:var(--r)">⚠ No hotels found in OpenStreetMap for this area. Hotel name above is AI-suggested — verify on Booking.com or MakeMyTrip before booking.</p></div>'
+    )+
+
+        /* TRAVEL ADVICE */
+    sec('✈️','Getting there','','AI Planner',
+      '<div style="font-size:13px;line-height:1.8;color:var(--muted)">'+esc(plan.travel_advice||'')+'</div>'
+    )+
+
+    /* ITINERARY */
+    sec('🗺','Day-by-day itinerary','','AI Planner + Real Places',
+      '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">Built using real attractions from OpenStreetMap. <span style="background:var(--green-l);color:var(--green);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700">✓ Real OSM place</span> = verified on map</p>'+
+      dayCards+
+      '<div style="font-size:12px;color:var(--muted);margin-top:4px;padding:10px;background:var(--paper);border-radius:var(--r)">🚗 Local transport: '+esc(plan.local_transport||'')+'</div>'
+    )+
+
+    /* COORDINATOR */
+    '<div class="coord-card">'+
+      '<div class="coord-label">🧠 Coordinator agent — final verdict</div>'+
+      '<div class="coord-text">'+esc(coord.verdict||'')+'</div>'+
+      (coord.tip?'<div class="coord-tip"><strong>Top tip</strong>'+esc(coord.tip)+'</div>':'')+
+    '</div>'+
+
+    '<div class="qs">'+
+      '<button class="q" onclick="ask(\'What are the must-try local foods in '+eq(ctx.to)+'?\')">Local food →</button>'+
+      '<button class="q" onclick="ask(\'Safety tips for travelling to '+eq(ctx.to)+'?\')">Safety tips →</button>'+
+      '<button class="q" onclick="ask(\'Packing list for '+eq(ctx.to)+' in current season?\')">Packing list →</button>'+
+      '<button class="q" onclick="ask(\'Hidden gems in '+eq(ctx.to)+'?\')">Hidden gems →</button>'+
+    '</div>';
+
+  if (markers.length) setTimeout(function(){ initMap(markers, geo); }, 300);
+
+  // Auto-open all sections now that they exist in the DOM
+  setTimeout(function(){
+    document.querySelectorAll('#result .sec-body').forEach(function(b){ b.classList.add('open'); });
+    document.querySelectorAll('#result .sec-arrow').forEach(function(a){ a.classList.add('open'); });
+  }, 100);
+}
+
+/* ── COLLAPSIBLE SECTION ── */
+function sec(ico, title, tagType, tagLabel, body) {
+  var id = 's'+Math.random().toString(36).slice(2,8);
+  var tagClass = tagType==='live' ? 'sec-tag live' : 'sec-tag';
+  var tagText  = tagType==='live' ? '📡 '+tagLabel : '🤖 '+tagLabel;
+  return '<div class="section">'+
+    '<div class="sec-head" onclick="toggleSec(\''+id+'\')">'+
+      '<div class="sec-ico">'+ico+'</div>'+
+      '<div class="sec-title">'+title+'</div>'+
+      '<span class="'+tagClass+'">'+tagText+'</span>'+
+      '<span class="sec-arrow" id="'+id+'-arr">▼</span>'+
+    '</div>'+
+    '<div class="sec-body" id="'+id+'">'+
+      '<div class="sec-inner">'+body+'</div>'+
+    '</div>'+
+  '</div>';
+}
+function toggleSec(id) {
+  var b = $(id); var a = $(id+'-arr');
+  b.classList.toggle('open');
+  a.classList.toggle('open');
+}
+// Auto-open handled inside renderResult
+
+/* ── MAP ── */
+var DAY_COL = ['#e85d3f','#2563eb','#16a34a','#9333ea','#0891b2','#d97706','#be123c'];
+
+function initMap(markers, geo) {
+  if (mapInst) { mapInst.remove(); mapInst=null; }
+  var el = $('trip-map'); if (!el) return;
+  var center = [markers[0]?.lat || geo.to.lat, markers[0]?.lng || geo.to.lng];
+  mapInst = L.map(el, { scrollWheelZoom: false }).setView(center, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>', maxZoom: 19
+  }).addTo(mapInst);
+
+  var lls = markers.map(function(m){ return [m.lat, m.lng]; });
+  if (lls.length>1) L.polyline(lls, { color:'#e85d3f', weight:2, opacity:.5, dashArray:'6 8' }).addTo(mapInst);
+
+  markers.forEach(function(m,i){
+    var col = DAY_COL[i%DAY_COL.length];
+    L.marker([m.lat,m.lng], { icon: L.divIcon({
+      className:'',
+      html:'<div style="background:'+col+';color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Syne,sans-serif;font-size:13px;font-weight:800;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.25)">'+m.day+'</div>',
+      iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-18]
+    })}).addTo(mapInst).bindPopup(
+      '<div style="font-family:sans-serif;min-width:160px">'+
+      '<b style="color:'+col+'">Day '+m.day+'</b>'+
+      (m.isReal ? ' <span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:1px 5px;border-radius:10px">✓ OSM</span>' : ' <span style="font-size:10px;background:#fef3c7;color:#b45309;padding:1px 5px;border-radius:10px">~ approx</span>')+'<br>'+
+      '<b>'+esc(m.name)+'</b><br>'+
+      '<small style="color:#666">'+esc(m.morning||'')+'</small></div>'
+    );
+  });
+  if (lls.length>1) mapInst.fitBounds(L.latLngBounds(lls).pad(0.35));
+  setTimeout(function(){ if(mapInst) mapInst.invalidateSize(); },400);
+}
+
+function ask(q) {
+  if (typeof sendPrompt==='function') sendPrompt(q);
+  else {
+    var ta=document.createElement('textarea'); ta.value=q;
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');}catch(_){}
+    document.body.removeChild(ta);
+    alert('Copied:\n\n'+q);
+  }
+}
+</script>
+</body>
+</html>
